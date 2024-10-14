@@ -1,0 +1,76 @@
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, SimpleRNN, Dense, Dropout, BatchNormalization
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.metrics import Precision, Recall
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+import numpy as np
+import pandas as pd
+
+# Load the data
+data = pd.read_csv('stress.csv')
+
+# Extract features and target
+X = data[['Theoretical pI', 'Instability index', 'Gravy']].values
+y = data['Target'].values
+
+# Encode target labels
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(y)
+
+# Split the data into train, validation, and test sets
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.2, random_state=42)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
+
+# Reshape the input data to 3D tensor
+X_train = np.reshape(X_train, (X_train.shape[0], 1, X_train.shape[1]))
+X_val = np.reshape(X_val, (X_val.shape[0], 1, X_val.shape[1]))
+X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
+
+# Build the model
+model = Sequential([
+    LSTM(64, activation='relu', return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])),
+    Dropout(0.2),
+    BatchNormalization(),
+    SimpleRNN(64, activation='relu', return_sequences=True),
+    Dropout(0.2),
+    BatchNormalization(),
+    tf.keras.layers.Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.2),
+    BatchNormalization(),
+    Dense(64, activation='relu'),
+    Dropout(0.2),
+    BatchNormalization(),
+    Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+optimizer = Adam(learning_rate=0.001)
+model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy', Precision(), Recall(), F1Score()])
+
+# Define callbacks
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, verbose=1, mode='min')
+model_checkpoint = ModelCheckpoint('best_model.h5', monitor='val_loss', save_best_only=True, mode='min')
+
+# Train the model
+history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_val, y_val),
+                    callbacks=[early_stopping, model_checkpoint])
+
+# Load the best model
+model.load_weights('best_model.h5')
+
+# Evaluate the model
+test_loss, test_acc, test_precision, test_recall, test_f1_score = model.evaluate(X_test, y_test)
+print(f"Test Accuracy: {test_acc}, Precision: {test_precision}, Recall: {test_recall}, F1 Score: {test_f1_score}")
+
+# Example prediction
+new_data = np.random.random((1, 1, 3))
+prediction = model.predict(new_data)
+print("Prediction:", prediction)
+
+
+results
+Test Accuracy: 0.5533498525619507, Precision: 0.8624535202980042, Recall: 0.9469387531280518, F1 Score: 0.9027237296104431
